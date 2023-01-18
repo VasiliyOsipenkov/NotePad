@@ -10,10 +10,11 @@ import java.awt.event.KeyEvent;
 import java.io.*;
 
 public class NotePad extends JFrame {
-    JTextArea text;
-    JMenuBar menuBar;
-    JFileChooser chooser;
-    JScrollPane scrollPane;
+    private final JTextArea text;
+    private final JMenuBar menuBar;
+    private final JFileChooser chooser;
+    private final JScrollPane scrollPane;
+    private boolean editTextArea = false;
     public NotePad() {
         super("NotePad");
         setBounds(800, 400, 600, 400);
@@ -57,11 +58,14 @@ public class NotePad extends JFrame {
     }
 
     private void openFile() {
+        if (editTextArea)
+            if (!exitDialogPane())
+                return;
+
         chooser.setDialogTitle("Open file");
         int val = chooser.showOpenDialog(this);
 
         if (val == JFileChooser.APPROVE_OPTION) {
-            setTitle(chooser.getSelectedFile().toString());
             try (FileInputStream inputStream = new FileInputStream(chooser.getSelectedFile())){
                 StringBuilder sb = new StringBuilder();
                 int i;
@@ -70,23 +74,25 @@ public class NotePad extends JFrame {
                 }
                 text.setText(sb.toString());
                 text.setCaretPosition(0);
+                setTitle(chooser.getSelectedFile().toString());
+                editTextArea = false;
             } catch (FileNotFoundException ex) {
-                throw new RuntimeException(ex);
+                errorPane("File read error:\n" + ex);
             } catch (IOException ex) {
-                throw new RuntimeException(ex);
+                errorPane("File read data error: \n" + ex);
             }
         }
 
     }
 
     private void saveFile() {
+        setTitle(chooser.getSelectedFile().toString());
         if (chooser.getSelectedFile() != null) {
             save();
         } else {
             chooser.setDialogTitle("Save file");
             int val = chooser.showSaveDialog(this);
             if (val == JFileChooser.APPROVE_OPTION) {
-                setTitle(chooser.getSelectedFile().toString());
                 save();
             }
         }
@@ -95,10 +101,11 @@ public class NotePad extends JFrame {
     private void save() {
         try (FileOutputStream outputStream = new FileOutputStream(chooser.getSelectedFile())){
             outputStream.write(text.getText().getBytes());
+            editTextArea = false;
         } catch (FileNotFoundException e) {
-            throw new RuntimeException(e);
+            errorPane("File write error\n" + e);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            errorPane("file write data error\n" + e);
         }
     }
 
@@ -123,26 +130,38 @@ public class NotePad extends JFrame {
     }
 
     private void closeFile() {
+        if (editTextArea)
+            if (!exitDialogPane())
+                return;
+
         chooser.setSelectedFile(new File(""));
-        setTitle("NotePad");
         text.setText(null);
+        setTitle("NotePad");
+        editTextArea = false;
         /*
         проверочка
         */
+    }
+    private void changeTitle() {
+        if (chooser.getSelectedFile() == null) {
+            setTitle("New text*");
+            editTextArea = true;
+        }
+        else {
+            setTitle(chooser.getSelectedFile().toString() + "*");
+            editTextArea = true;
+        }
     }
     private void textChangeListener() {
         text.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
-                if (chooser.getSelectedFile() == null)
-                    setTitle("New text*");
-                else {
-                    setTitle(chooser.getSelectedFile().toString() + "*");//Заголовок должен отображать признак того, что редактор содержит несохранённые изменения.
-                }
+                changeTitle();
             }
 
             @Override
             public void removeUpdate(DocumentEvent e) {
+                changeTitle();
             }
 
             @Override
@@ -150,16 +169,27 @@ public class NotePad extends JFrame {
             }
         });
     }
+    private void errorPane(String s) {
+        int result = JOptionPane.showConfirmDialog(this,s,
+                "Error",
+                JOptionPane.ERROR_MESSAGE);
+    }
+
+    private boolean exitDialogPane() {
+        int result = JOptionPane.showConfirmDialog(this,"Delete unsaved text?",
+                "Exit confirmation",
+                JOptionPane.YES_NO_OPTION);
+        if (result == JOptionPane.YES_OPTION && editTextArea) {
+            return true;
+        } else
+            return false;
+
+    }
 
     public static void main(String[] args) {
         new NotePad().setVisible(true);
     }
 }
 /*
-
-*Заголовок должен отображать признак того, что редактор содержит несохранённые изменения.
-Редактор должен:
-
-При возникновении ошибок чтения/сохранения файла пользователю должно быть показано соответствующее сообщение.
 При создании нового файла, загрузке файла и при выходе, если редактор содержит текст с несохранёнными изменениями, то
 операция должна выполняться после дополнительного подтверждения.*/
