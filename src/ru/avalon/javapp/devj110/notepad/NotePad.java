@@ -1,14 +1,19 @@
 package ru.avalon.javapp.devj110.notepad;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.io.*;
 
 public class NotePad extends JFrame {
     JTextArea text;
     JMenuBar menuBar;
     JFileChooser chooser;
-    JScrollPane scrollPane;//https://spec-zone.ru/RU/Java/Tutorials/uiswing/components/scrollpane.html
+    JScrollPane scrollPane;
     public NotePad() {
         super("NotePad");
         setBounds(800, 400, 600, 400);
@@ -26,7 +31,15 @@ public class NotePad extends JFrame {
         JMenuItem saveAsFile = new JMenuItem("Save as");
         JMenuItem closeFile = new JMenuItem("Close");
 
+        openFile.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_O, ActionEvent.CTRL_MASK));
+        saveFile.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, ActionEvent.CTRL_MASK));
+        saveAsFile.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, Event.CTRL_MASK | Event.SHIFT_MASK));
+        closeFile.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, ActionEvent.CTRL_MASK));
+
         openFile.addActionListener(e -> openFile());
+        saveFile.addActionListener(e -> saveFile());
+        saveAsFile.addActionListener(e -> saveAsFile());
+        closeFile.addActionListener(e -> closeFile());
 
         fileMenu.add(openFile);
         fileMenu.add(saveFile);
@@ -39,17 +52,49 @@ public class NotePad extends JFrame {
 
         add(menuBar, BorderLayout.NORTH);
         add(scrollPane, BorderLayout.CENTER);
+        textChangeListener();
 
     }
 
     private void openFile() {
+        chooser.setDialogTitle("Open file");
         int val = chooser.showOpenDialog(this);
-        try {
-            FileReader fileReader = new FileReader(chooser.getSelectedFile());
-            BufferedReader reader = new BufferedReader(fileReader);
-            while (reader.ready()) {
-                text.append(reader.readLine() + "\n");
+
+        if (val == JFileChooser.APPROVE_OPTION) {
+            setTitle(chooser.getSelectedFile().toString());
+            try (FileInputStream inputStream = new FileInputStream(chooser.getSelectedFile())){
+                StringBuilder sb = new StringBuilder();
+                int i;
+                while ((i = inputStream.read()) != -1) {
+                    sb.append((char) i);
+                }
+                text.setText(sb.toString());
+                text.setCaretPosition(0);
+            } catch (FileNotFoundException ex) {
+                throw new RuntimeException(ex);
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
             }
+        }
+
+    }
+
+    private void saveFile() {
+        if (chooser.getSelectedFile() != null) {
+            save();
+        } else {
+            chooser.setDialogTitle("Save file");
+            int val = chooser.showSaveDialog(this);
+            if (val == JFileChooser.APPROVE_OPTION) {
+                setTitle(chooser.getSelectedFile().toString());
+                save();
+            }
+        }
+    }
+
+    private void save() {
+        try (FileOutputStream outputStream = new FileOutputStream(chooser.getSelectedFile())){
+            outputStream.write(text.getText().getBytes());
         } catch (FileNotFoundException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
@@ -57,35 +102,64 @@ public class NotePad extends JFrame {
         }
     }
 
+    private void saveAsFile() {
+        File file = chooser.getSelectedFile();
+        chooser.setDialogTitle("Save file as");
+        int val = chooser.showSaveDialog(this);
+
+        if (val == JFileChooser.APPROVE_OPTION) {
+            if (!file.equals(chooser.getSelectedFile()) && chooser.getSelectedFile().exists()) {
+                int result = JOptionPane.showConfirmDialog(this,"Overwrite file?",
+                        "Overwrite",
+                        JOptionPane.YES_NO_OPTION);
+                if (result == JOptionPane.YES_OPTION)
+                    setTitle(chooser.getSelectedFile().toString());
+                    save();
+            } else {
+                setTitle(chooser.getSelectedFile().toString());
+                save();
+            }
+        }
+    }
+
+    private void closeFile() {
+        chooser.setSelectedFile(new File(""));
+        setTitle("NotePad");
+        text.setText(null);
+        /*
+        проверочка
+        */
+    }
+    private void textChangeListener() {
+        text.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                if (chooser.getSelectedFile() == null)
+                    setTitle("New text*");
+                else {
+                    setTitle(chooser.getSelectedFile().toString() + "*");//Заголовок должен отображать признак того, что редактор содержит несохранённые изменения.
+                }
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+            }
+        });
+    }
+
     public static void main(String[] args) {
         new NotePad().setVisible(true);
     }
 }
-/*Реализуйте приложение, выполняющее функции простого текстового редактора, при помощи
-которого можно редактировать текст, сохранять его в файл и загружать из файла.
-Редактор должен иметь меню для доступа к его функциям.
-В заголовке окна редактора должно отображаться полное имя редактируемого файла. Если редактируется новый файл,
-то заголовок должен содержать соответствующий текст.
+/*
+
 *Заголовок должен отображать признак того, что редактор содержит несохранённые изменения.
 Редактор должен:
-• позволять пользователю загружать текст из файла;
-• сохранять текст в файл; если файл ранее был загружен, или сохранялся, то текст должен
-быть сохранён в файл с тем же именем; если текст не был загружен и ещё не сохранялся,
-то у пользователя должно быть запрошено расположение и имя файла, в который нужно
-сохранить текст;
-• сохранять текст в файл с именем, отличным от того, из которого файл был загружен, или
-в который он был сохранён ранее; если пользователь сохраняет файл с другим именем, и
-такой файл уже существует, то должно запрашиваться дополнительное подтверждение на
-перезапись файла;
-• очищать поле редактирования текста и сброс имени файла (закрытие и создание нового
-файла).
-Функции работы с файлами должны быть доступны из меню, а также по обычному сочетанию
-клавиш:
-• очистка редактора (текста) — Ctrl+N;
-• загрузка файла — Ctrl+O;
-• сохранение файла — Ctrl+S;
-• сохранение файла под новым именем — Ctrl+Shift+S;
-• завершение работы с редактором (выход) — Ctrl+W.
+
 При возникновении ошибок чтения/сохранения файла пользователю должно быть показано соответствующее сообщение.
 При создании нового файла, загрузке файла и при выходе, если редактор содержит текст с несохранёнными изменениями, то
 операция должна выполняться после дополнительного подтверждения.*/
