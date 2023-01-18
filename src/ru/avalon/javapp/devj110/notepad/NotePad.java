@@ -33,12 +33,13 @@ public class NotePad extends JFrame {
         fileMenu.add(saveAsFile);
         fileMenu.add(closeFile);
         menuBar.add(fileMenu);
+        scrollPane = new JScrollPane(text);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
 
-
-
-        add(text, BorderLayout.CENTER);
         add(menuBar, BorderLayout.NORTH);
-        add(new JScrollPane(text));
+        add(scrollPane, BorderLayout.CENTER);
+
     }
 
     private void openFile() {
