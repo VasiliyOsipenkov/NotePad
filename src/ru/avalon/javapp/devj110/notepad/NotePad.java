@@ -4,9 +4,7 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.InputEvent;
-import java.awt.event.KeyEvent;
+import java.awt.event.*;
 import java.io.*;
 
 public class NotePad extends JFrame {
@@ -18,7 +16,7 @@ public class NotePad extends JFrame {
     public NotePad() {
         super("NotePad");
         setBounds(800, 400, 600, 400);
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
 
         text = new JTextArea();
         text.setEditable(true);
@@ -27,25 +25,30 @@ public class NotePad extends JFrame {
         menuBar = new JMenuBar();
 
         JMenu fileMenu = new JMenu("File");
+        JMenuItem clearText = new JMenuItem("Clear");
         JMenuItem openFile = new JMenuItem("Open");
         JMenuItem saveFile = new JMenuItem("Save");
         JMenuItem saveAsFile = new JMenuItem("Save as");
-        JMenuItem closeFile = new JMenuItem("Close");
+        JMenuItem exit = new JMenuItem("Exit");
 
+        clearText.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_N, ActionEvent.CTRL_MASK));
         openFile.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_O, ActionEvent.CTRL_MASK));
         saveFile.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, ActionEvent.CTRL_MASK));
         saveAsFile.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, Event.CTRL_MASK | Event.SHIFT_MASK));
-        closeFile.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, ActionEvent.CTRL_MASK));
+        exit.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, ActionEvent.CTRL_MASK));
 
+        clearText.addActionListener(e -> clearText());
         openFile.addActionListener(e -> openFile());
         saveFile.addActionListener(e -> saveFile());
         saveAsFile.addActionListener(e -> saveAsFile());
-        closeFile.addActionListener(e -> closeFile());
+        exit.addActionListener(e -> exit());
 
+        fileMenu.add(clearText);
         fileMenu.add(openFile);
         fileMenu.add(saveFile);
         fileMenu.add(saveAsFile);
-        fileMenu.add(closeFile);
+        fileMenu.add(exit);
+
         menuBar.add(fileMenu);
         scrollPane = new JScrollPane(text);
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
@@ -54,12 +57,13 @@ public class NotePad extends JFrame {
         add(menuBar, BorderLayout.NORTH);
         add(scrollPane, BorderLayout.CENTER);
         textChangeListener();
+        windowListener();
 
     }
 
     private void openFile() {
         if (editTextArea)
-            if (!exitDialogPane())
+            if (!exitDialogPane("Delete unsaved text?"))
                 return;
 
         chooser.setDialogTitle("Open file");
@@ -86,10 +90,13 @@ public class NotePad extends JFrame {
     }
 
     private void saveFile() {
-        setTitle(chooser.getSelectedFile().toString());
         if (chooser.getSelectedFile() != null) {
             save();
         } else {
+            if (editTextArea)
+                if (!exitDialogPane("Create a new file?"))
+                return;
+
             chooser.setDialogTitle("Save file");
             int val = chooser.showSaveDialog(this);
             if (val == JFileChooser.APPROVE_OPTION) {
@@ -102,6 +109,7 @@ public class NotePad extends JFrame {
         try (FileOutputStream outputStream = new FileOutputStream(chooser.getSelectedFile())){
             outputStream.write(text.getText().getBytes());
             editTextArea = false;
+            setTitle(chooser.getSelectedFile().toString());
         } catch (FileNotFoundException e) {
             errorPane("File write error\n" + e);
         } catch (IOException e) {
@@ -110,44 +118,45 @@ public class NotePad extends JFrame {
     }
 
     private void saveAsFile() {
-        File file = chooser.getSelectedFile();
         chooser.setDialogTitle("Save file as");
         int val = chooser.showSaveDialog(this);
 
         if (val == JFileChooser.APPROVE_OPTION) {
-            if (!file.equals(chooser.getSelectedFile()) && chooser.getSelectedFile().exists()) {
+            if (chooser.getSelectedFile().exists()) {
                 int result = JOptionPane.showConfirmDialog(this,"Overwrite file?",
                         "Overwrite",
                         JOptionPane.YES_NO_OPTION);
                 if (result == JOptionPane.YES_OPTION)
-                    setTitle(chooser.getSelectedFile().toString());
                     save();
             } else {
-                setTitle(chooser.getSelectedFile().toString());
                 save();
             }
         }
     }
 
-    private void closeFile() {
+    private void clearText() {
         if (editTextArea)
-            if (!exitDialogPane())
+            if (!exitDialogPane("Delete unsaved text?"))
                 return;
 
-        chooser.setSelectedFile(new File(""));
+        chooser.setSelectedFile(null);
         text.setText(null);
         setTitle("NotePad");
         editTextArea = false;
-        /*
-        проверочка
-        */
+    }
+
+    private void exit() {
+        if (editTextArea) {
+            if (exitDialogPane("Changes not saved, close editor?"))
+                System.exit(1);
+        } else
+            System.exit(1);
     }
     private void changeTitle() {
         if (chooser.getSelectedFile() == null) {
             setTitle("New text*");
             editTextArea = true;
-        }
-        else {
+        } else {
             setTitle(chooser.getSelectedFile().toString() + "*");
             editTextArea = true;
         }
@@ -175,8 +184,8 @@ public class NotePad extends JFrame {
                 JOptionPane.ERROR_MESSAGE);
     }
 
-    private boolean exitDialogPane() {
-        int result = JOptionPane.showConfirmDialog(this,"Delete unsaved text?",
+    private boolean exitDialogPane(String s) {
+        int result = JOptionPane.showConfirmDialog(this,s,
                 "Exit confirmation",
                 JOptionPane.YES_NO_OPTION);
         if (result == JOptionPane.YES_OPTION && editTextArea) {
@@ -186,10 +195,16 @@ public class NotePad extends JFrame {
 
     }
 
+    private void windowListener() {
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                exit();
+            }
+        });
+    }
+
     public static void main(String[] args) {
         new NotePad().setVisible(true);
     }
 }
-/*
-При создании нового файла, загрузке файла и при выходе, если редактор содержит текст с несохранёнными изменениями, то
-операция должна выполняться после дополнительного подтверждения.*/
